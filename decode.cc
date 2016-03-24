@@ -10,17 +10,16 @@ static AVFormatContext *fmt_ctx = NULL;
 static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
 static AVStream *video_stream = NULL, *audio_stream = NULL;
 static const char *src_filename = NULL;
-static FILE *video_dst_file = NULL;
-static FILE *audio_dst_file = NULL;
 
 static int video_stream_idx = -1, audio_stream_idx = -1;
 static AVFrame *frame = NULL;
 static AVPacket pkt;
-static int video_frame_count = 0;
-static int audio_frame_count = 0;
 
 static uint8_t* video_buffer = nullptr;
 static int video_buffer_size = 0;
+
+static int video_tag = 0x22057601;
+static int audio_tag = 0x22057602;
 
 static int decode_packet(int *got_frame, int cached)
 {
@@ -38,9 +37,6 @@ static int decode_packet(int *got_frame, int cached)
     }
 
     if (*got_frame) {
-      fwrite(&frame->width, 1, sizeof(frame->width), video_dst_file);
-      fwrite(&frame->height, 1, sizeof(frame->height), video_dst_file);
-      fwrite(&frame->format, 1, sizeof(frame->format), video_dst_file);
       if (!video_buffer) {
 	video_buffer_size = av_image_get_buffer_size(AVPixelFormat(frame->format),
 						     frame->width,
@@ -54,8 +50,13 @@ static int decode_packet(int *got_frame, int cached)
 					    frame->width,
 					    frame->height,
 					    1);
-      printf("%d %d\n", written, video_buffer_size);
-      //fwrite(video_dst_data[0], 1, video_dst_bufsize, video_dst_file);
+      fwrite(&audio_tag, 1, sizeof(video_tag), stdout);
+      fwrite(&frame->width, 1, sizeof(frame->width), stdout);
+      fwrite(&frame->height, 1, sizeof(frame->height), stdout);
+      fwrite(&frame->format, 1, sizeof(frame->format), stdout);
+      fwrite(&written, 1, sizeof(video_buffer_size), stdout);
+      fwrite(video_buffer, 1, video_buffer_size, stdout);
+      fflush(stdout);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
     /* decode audio frame */
@@ -64,30 +65,20 @@ static int decode_packet(int *got_frame, int cached)
       fprintf(stderr, "Error decoding audio frame (%s)\n", av_err2str(ret));
       return ret;
     }
-    /* Some audio decoders decode only part of the packet, and have to be
-     * called again with the remainder of the packet data.
-     * Sample: fate-suite/lossless-audio/luckynight-partial.shn
-     * Also, some decoders might over-read the packet. */
+
     decoded = FFMIN(ret, pkt.size);
 
     if (*got_frame) {
-      //size_t unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(AVSampleFormat(frame->format));
-#if 0
-      printf("audio_frame%s n:%d nb_samples:%d pts:%s\n",
-	     cached ? "(cached)" : "",
-	     audio_frame_count++, frame->nb_samples,
-	     av_ts2timestr(frame->pts, &audio_dec_ctx->time_base));
-#endif
-
-      /* Write the raw audio data samples of the first plane. This works
-       * fine for packed formats (e.g. AV_SAMPLE_FMT_S16). However,
-       * most audio decoders output planar audio, which uses a separate
-       * plane of audio samples for each channel (e.g. AV_SAMPLE_FMT_S16P).
-       * In other words, this code will write only the first audio channel
-       * in these cases.
-       * You should use libswresample or libavfilter to convert the frame
-       * to packed data. */
-      //fwrite(frame->extended_data[0], 1, unpadded_linesize, audio_dst_file);
+      int unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(AVSampleFormat(frame->format));
+      int bytes = unpadded_linesize * frame->channels;
+      fwrite(&video_tag, 1, sizeof(video_tag), stdout);
+      fwrite(&frame->channels, 1, sizeof(frame->channels), stdout);
+      fwrite(&frame->format, 1, sizeof(frame->format), stdout);
+      fwrite(&frame->nb_samples, 1, sizeof(frame->nb_samples), stdout);
+      fwrite(&bytes, 1, sizeof(bytes), stdout);
+      for (int c = 0; c < frame->channels; ++c)
+	fwrite(frame->extended_data[c], 1, unpadded_linesize, stdout);
+      fflush(stdout);
     }
   }
 
@@ -165,13 +156,11 @@ int main (int argc, char **argv)
   if (open_codec_context(&video_stream_idx, fmt_ctx, AVMEDIA_TYPE_VIDEO) >= 0) {
     video_stream = fmt_ctx->streams[video_stream_idx];
     video_dec_ctx = video_stream->codec;
-    video_dst_file = stdout;
   }
 
   if (open_codec_context(&audio_stream_idx, fmt_ctx, AVMEDIA_TYPE_AUDIO) >= 0) {
     audio_stream = fmt_ctx->streams[audio_stream_idx];
     audio_dec_ctx = audio_stream->codec;
-    audio_dst_file = stderr;
   }
 
   /* dump input information to stderr */
@@ -217,37 +206,10 @@ int main (int argc, char **argv)
 
   printf("Demuxing succeeded.\n");
 
-  if (audio_stream) {
-    enum AVSampleFormat sfmt = audio_dec_ctx->sample_fmt;
-    int n_channels = audio_dec_ctx->channels;
-    const char *fmt;
-
-    if (av_sample_fmt_is_planar(sfmt)) {
-      const char *packed = av_get_sample_fmt_name(sfmt);
-      fprintf(stderr,
-	      "Warning: the sample format the decoder produced is planar "
-	      "(%s). This example will output the first channel only.\n",
-	     packed ? packed : "?");
-      sfmt = av_get_packed_sample_fmt(sfmt);
-      n_channels = 1;
-    }
-
-    /*
-    printf("Play the output audio file with the command:\n"
-	   "ffplay -f %s -ac %d -ar %d %s\n",
-	   fmt, n_channels, audio_dec_ctx->sample_rate,
-	   audio_dst_filename);
-    */
-  }
-
  end:
   avcodec_close(video_dec_ctx);
   avcodec_close(audio_dec_ctx);
   avformat_close_input(&fmt_ctx);
-  if (video_dst_file)
-    fclose(video_dst_file);
-  if (audio_dst_file)
-    fclose(audio_dst_file);
   av_frame_free(&frame);
 
   return ret < 0;
