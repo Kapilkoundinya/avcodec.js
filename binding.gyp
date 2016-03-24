@@ -9,7 +9,7 @@
         "/usr/local/include",
       ],
       "libraries": [
-        "-lavcodec", "-L/usr/local/lib"
+        "-lavcodec", "-lavformat", "-L/usr/local/lib"
       ],
       "xcode_settings": {
         "OTHER_CFLAGS": [

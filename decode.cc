@@ -1,9 +1,11 @@
+extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/samplefmt.h>
 #include <libavutil/timestamp.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+}
 
 static AVFormatContext *fmt_ctx = NULL;
 static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
@@ -11,8 +13,6 @@ static int width, height;
 static enum AVPixelFormat pix_fmt;
 static AVStream *video_stream = NULL, *audio_stream = NULL;
 static const char *src_filename = NULL;
-static const char *video_dst_filename = NULL;
-static const char *audio_dst_filename = NULL;
 static FILE *video_dst_file = NULL;
 static FILE *audio_dst_file = NULL;
 
@@ -25,12 +25,6 @@ static AVFrame *frame = NULL;
 static AVPacket pkt;
 static int video_frame_count = 0;
 static int audio_frame_count = 0;
-
-/* Enable or disable frame reference counting. You are not supposed to support
- * both paths in your application but pick the one most appropriate to your
- * needs. Look for the use of refcount in this example to see what are the
- * differences of API usage between them. */
-static int refcount = 0;
 
 static int decode_packet(int *got_frame, int cached)
 {
@@ -110,11 +104,6 @@ static int decode_packet(int *got_frame, int cached)
     }
   }
 
-  /* If we use frame reference counting, we own the data and need
-   * to de-reference it when we don't use it anymore */
-  if (*got_frame && refcount)
-    av_frame_unref(frame);
-
   return decoded;
 }
 
@@ -145,8 +134,8 @@ static int open_codec_context(int *stream_idx,
       return AVERROR(EINVAL);
     }
 
-    /* Init the decoders, with or without reference counting */
-    av_dict_set(&opts, "refcounted_frames", refcount ? "1" : "0", 0);
+    /* Init the decoders, without reference counting */
+    av_dict_set(&opts, "refcounted_frames", "0", 0);
     if ((ret = avcodec_open2(dec_ctx, dec, &opts)) < 0) {
       fprintf(stderr, "Failed to open %s codec\n",
 	      av_get_media_type_string(type));
@@ -190,25 +179,14 @@ int main (int argc, char **argv)
 {
   int ret = 0, got_frame;
 
-  if (argc != 4 && argc != 5) {
-    fprintf(stderr, "usage: %s [-refcount] input_file video_output_file audio_output_file\n"
-                "API example program to show how to read frames from an input file.\n"
-                "This program reads frames from a file, decodes them, and writes decoded\n"
-                "video frames to a rawvideo file named video_output_file, and decoded\n"
-                "audio frames to a rawaudio file named audio_output_file.\n\n"
-                "If the -refcount option is specified, the program use the\n"
-                "reference counting frame system which allows keeping a copy of\n"
-                "the data for longer than one decode call.\n"
-	    "\n", argv[0]);
-    exit(1);
-  }
-  if (argc == 5 && !strcmp(argv[1], "-refcount")) {
-    refcount = 1;
-    argv++;
+  if (argc != 2) {
+    fprintf(stderr,
+	    "usage: %s <video-file>\n"
+	    "This will dump video frames to stdout and audio frames to stderr.\n"
+	    , argv[0]);
+    exit(-1);
   }
   src_filename = argv[1];
-  video_dst_filename = argv[2];
-  audio_dst_filename = argv[3];
 
   /* register all formats and codecs */
   av_register_all();
@@ -228,13 +206,7 @@ int main (int argc, char **argv)
   if (open_codec_context(&video_stream_idx, fmt_ctx, AVMEDIA_TYPE_VIDEO) >= 0) {
     video_stream = fmt_ctx->streams[video_stream_idx];
     video_dec_ctx = video_stream->codec;
-
-    video_dst_file = fopen(video_dst_filename, "wb");
-    if (!video_dst_file) {
-      fprintf(stderr, "Could not open destination file %s\n", video_dst_filename);
-      ret = 1;
-      goto end;
-    }
+    video_dst_file = stdout;
 
     /* allocate image where the decoded image will be put */
     width = video_dec_ctx->width;
@@ -252,12 +224,7 @@ int main (int argc, char **argv)
   if (open_codec_context(&audio_stream_idx, fmt_ctx, AVMEDIA_TYPE_AUDIO) >= 0) {
     audio_stream = fmt_ctx->streams[audio_stream_idx];
     audio_dec_ctx = audio_stream->codec;
-    audio_dst_file = fopen(audio_dst_filename, "wb");
-    if (!audio_dst_file) {
-      fprintf(stderr, "Could not open destination file %s\n", audio_dst_filename);
-      ret = 1;
-      goto end;
-    }
+    audio_dst_file = stderr;
   }
 
   /* dump input information to stderr */
@@ -281,10 +248,12 @@ int main (int argc, char **argv)
   pkt.data = NULL;
   pkt.size = 0;
 
+  /*
   if (video_stream)
-    printf("Demuxing video from file '%s' into '%s'\n", src_filename, video_dst_filename);
+    printf("Demuxing video from file '%s' into '%s'\n", src_filename);
   if (audio_stream)
-    printf("Demuxing audio from file '%s' into '%s'\n", src_filename, audio_dst_filename);
+    printf("Demuxing audio from file '%s' into '%s'\n", src_filename);
+  */
 
   /* read frames from the file */
   while (av_read_frame(fmt_ctx, &pkt) >= 0) {
@@ -308,12 +277,14 @@ int main (int argc, char **argv)
 
   printf("Demuxing succeeded.\n");
 
+  /*
   if (video_stream) {
     printf("Play the output video file with the command:\n"
 	   "ffplay -f rawvideo -pix_fmt %s -video_size %dx%d %s\n",
 	   av_get_pix_fmt_name(pix_fmt), width, height,
 	   video_dst_filename);
   }
+  */
 
   if (audio_stream) {
     enum AVSampleFormat sfmt = audio_dec_ctx->sample_fmt;
@@ -332,10 +303,12 @@ int main (int argc, char **argv)
     if ((ret = get_format_from_sample_fmt(&fmt, sfmt)) < 0)
       goto end;
 
+    /*
     printf("Play the output audio file with the command:\n"
 	   "ffplay -f %s -ac %d -ar %d %s\n",
 	   fmt, n_channels, audio_dec_ctx->sample_rate,
 	   audio_dst_filename);
+    */
   }
 
  end:
