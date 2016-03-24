@@ -42,7 +42,6 @@ static int decode_packet(int *got_frame, int cached)
     }
 
     if (*got_frame) {
-
       if (frame->width != width || frame->height != height ||
 	  frame->format != pix_fmt) {
 	/* To handle this change, one could call av_image_alloc again and
@@ -70,7 +69,7 @@ static int decode_packet(int *got_frame, int cached)
 		    pix_fmt, width, height);
 
       /* write to rawvideo file */
-      fwrite(video_dst_data[0], 1, video_dst_bufsize, video_dst_file);
+      //fwrite(video_dst_data[0], 1, video_dst_bufsize, video_dst_file);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
     /* decode audio frame */
@@ -100,7 +99,7 @@ static int decode_packet(int *got_frame, int cached)
        * in these cases.
        * You should use libswresample or libavfilter to convert the frame
        * to packed data. */
-      fwrite(frame->extended_data[0], 1, unpadded_linesize, audio_dst_file);
+      //fwrite(frame->extended_data[0], 1, unpadded_linesize, audio_dst_file);
     }
   }
 
