@@ -1,0 +1,13 @@
+{
+  "name": "avcodec",
+  "version": "0.0.1",
+  "description": "Node.js video encoding/decoding with libavcodec",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "gypfile": true,
+  "dependencies": {
+    "bindings": "^1.2.1"
+  }
+}
