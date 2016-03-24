@@ -247,13 +247,6 @@ int main (int argc, char **argv)
   pkt.data = NULL;
   pkt.size = 0;
 
-  /*
-  if (video_stream)
-    printf("Demuxing video from file '%s' into '%s'\n", src_filename);
-  if (audio_stream)
-    printf("Demuxing audio from file '%s' into '%s'\n", src_filename);
-  */
-
   /* read frames from the file */
   while (av_read_frame(fmt_ctx, &pkt) >= 0) {
     AVPacket orig_pkt = pkt;
@@ -276,15 +269,6 @@ int main (int argc, char **argv)
 
   printf("Demuxing succeeded.\n");
 
-  /*
-  if (video_stream) {
-    printf("Play the output video file with the command:\n"
-	   "ffplay -f rawvideo -pix_fmt %s -video_size %dx%d %s\n",
-	   av_get_pix_fmt_name(pix_fmt), width, height,
-	   video_dst_filename);
-  }
-  */
-
   if (audio_stream) {
     enum AVSampleFormat sfmt = audio_dec_ctx->sample_fmt;
     int n_channels = audio_dec_ctx->channels;
@@ -292,8 +276,9 @@ int main (int argc, char **argv)
 
     if (av_sample_fmt_is_planar(sfmt)) {
       const char *packed = av_get_sample_fmt_name(sfmt);
-      printf("Warning: the sample format the decoder produced is planar "
-	     "(%s). This example will output the first channel only.\n",
+      fprintf(stderr,
+	      "Warning: the sample format the decoder produced is planar "
+	      "(%s). This example will output the first channel only.\n",
 	     packed ? packed : "?");
       sfmt = av_get_packed_sample_fmt(sfmt);
       n_channels = 1;
