@@ -2,29 +2,25 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/samplefmt.h>
-#include <libavutil/timestamp.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 }
 
 static AVFormatContext *fmt_ctx = NULL;
 static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
-static int width, height;
-static enum AVPixelFormat pix_fmt;
 static AVStream *video_stream = NULL, *audio_stream = NULL;
 static const char *src_filename = NULL;
 static FILE *video_dst_file = NULL;
 static FILE *audio_dst_file = NULL;
-
-static uint8_t *video_dst_data[4] = {NULL};
-static int      video_dst_linesize[4];
-static int video_dst_bufsize;
 
 static int video_stream_idx = -1, audio_stream_idx = -1;
 static AVFrame *frame = NULL;
 static AVPacket pkt;
 static int video_frame_count = 0;
 static int audio_frame_count = 0;
+
+static uint8_t* video_buffer = nullptr;
+static int video_buffer_size = 0;
 
 static int decode_packet(int *got_frame, int cached)
 {
@@ -42,33 +38,23 @@ static int decode_packet(int *got_frame, int cached)
     }
 
     if (*got_frame) {
-      if (frame->width != width || frame->height != height ||
-	  frame->format != pix_fmt) {
-	/* To handle this change, one could call av_image_alloc again and
-	 * decode the following frames into another rawvideo file. */
-	fprintf(stderr, "Error: Width, height and pixel format have to be "
-                        "constant in a rawvideo file, but the width, height or "
-                        "pixel format of the input video changed:\n"
-                        "old: width = %d, height = %d, format = %s\n"
-		"new: width = %d, height = %d, format = %s\n",
-		width, height, av_get_pix_fmt_name(pix_fmt),
-		frame->width, frame->height,
-		av_get_pix_fmt_name(AVPixelFormat(frame->format)));
-	return -1;
+      fwrite(&frame->width, 1, sizeof(frame->width), video_dst_file);
+      fwrite(&frame->height, 1, sizeof(frame->height), video_dst_file);
+      fwrite(&frame->format, 1, sizeof(frame->format), video_dst_file);
+      if (!video_buffer) {
+	video_buffer_size = av_image_get_buffer_size(AVPixelFormat(frame->format),
+						     frame->width,
+						     frame->height,
+						     1);
+	video_buffer = (uint8_t*) malloc(video_buffer_size);
       }
-
-      printf("video_frame%s n:%d coded_n:%d pts:%s\n",
-	     cached ? "(cached)" : "",
-	     video_frame_count++, frame->coded_picture_number,
-	     av_ts2timestr(frame->pts, &video_dec_ctx->time_base));
-
-      /* copy decoded frame to destination buffer:
-       * this is required since rawvideo expects non aligned data */
-      av_image_copy(video_dst_data, video_dst_linesize,
-		    (const uint8_t **)(frame->data), frame->linesize,
-		    pix_fmt, width, height);
-
-      /* write to rawvideo file */
+      int written = av_image_copy_to_buffer(video_buffer, video_buffer_size,
+					    frame->data, frame->linesize,
+					    AVPixelFormat(frame->format),
+					    frame->width,
+					    frame->height,
+					    1);
+      printf("%d %d\n", written, video_buffer_size);
       //fwrite(video_dst_data[0], 1, video_dst_bufsize, video_dst_file);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
@@ -85,11 +71,13 @@ static int decode_packet(int *got_frame, int cached)
     decoded = FFMIN(ret, pkt.size);
 
     if (*got_frame) {
-      size_t unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(AVSampleFormat(frame->format));
+      //size_t unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(AVSampleFormat(frame->format));
+#if 0
       printf("audio_frame%s n:%d nb_samples:%d pts:%s\n",
 	     cached ? "(cached)" : "",
 	     audio_frame_count++, frame->nb_samples,
 	     av_ts2timestr(frame->pts, &audio_dec_ctx->time_base));
+#endif
 
       /* Write the raw audio data samples of the first plane. This works
        * fine for packed formats (e.g. AV_SAMPLE_FMT_S16). However,
@@ -206,18 +194,6 @@ int main (int argc, char **argv)
     video_stream = fmt_ctx->streams[video_stream_idx];
     video_dec_ctx = video_stream->codec;
     video_dst_file = stdout;
-
-    /* allocate image where the decoded image will be put */
-    width = video_dec_ctx->width;
-    height = video_dec_ctx->height;
-    pix_fmt = video_dec_ctx->pix_fmt;
-    ret = av_image_alloc(video_dst_data, video_dst_linesize,
-			 width, height, pix_fmt, 1);
-    if (ret < 0) {
-      fprintf(stderr, "Could not allocate raw video buffer\n");
-      goto end;
-    }
-    video_dst_bufsize = ret;
   }
 
   if (open_codec_context(&audio_stream_idx, fmt_ctx, AVMEDIA_TYPE_AUDIO) >= 0) {
@@ -304,7 +280,6 @@ int main (int argc, char **argv)
   if (audio_dst_file)
     fclose(audio_dst_file);
   av_frame_free(&frame);
-  av_free(video_dst_data[0]);
 
   return ret < 0;
 }
