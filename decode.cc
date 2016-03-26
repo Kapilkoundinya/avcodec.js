@@ -3,8 +3,10 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 #include <libavutil/samplefmt.h>
 #include <libavutil/log.h>
+#include <libavutil/imgutils.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 }
 
 #include <unistd.h>
@@ -19,8 +21,12 @@ static int video_stream_idx = -1, audio_stream_idx = -1;
 static AVFrame *frame = nullptr;
 static AVPacket pkt;
 
-static uint8_t* video_buffer = nullptr;
+static uint8_t* video_pointers[4] = { nullptr, };
+static int video_linesizes[4] = { 0, };
 static int video_buffer_size = 0;
+static AVPixelFormat video_output_format = AV_PIX_FMT_RGB24;
+
+static SwsContext *sws_ctx = nullptr;
 
 static int video_tag = 0x22057601;
 static int audio_tag = 0x22057602;
@@ -51,26 +57,23 @@ static int decode_packet(int *got_frame, int cached)
     }
 
     if (*got_frame) {
-      if (!video_buffer) {
-	video_buffer_size = av_image_get_buffer_size(AVPixelFormat(frame->format),
-						     frame->width,
-						     frame->height,
-						     1);
-	video_buffer = (uint8_t*) malloc(video_buffer_size);
+      if (!video_buffer_size)
+	video_buffer_size = av_image_alloc(video_pointers, video_linesizes,
+					   frame->width, frame->height, video_output_format, 1);
+      if (!sws_ctx) {
+	sws_ctx = sws_getContext(frame->width, frame->height, AVPixelFormat(frame->format),
+				 frame->width, frame->height, video_output_format,
+				 SWS_BILINEAR, nullptr, nullptr, nullptr);
       }
-      int bytes = av_image_copy_to_buffer(video_buffer, video_buffer_size,
-					  frame->data, frame->linesize,
-					  AVPixelFormat(frame->format),
-					  frame->width,
-					  frame->height,
-					  1);
+      sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height, video_pointers, video_linesizes);
+      int bytes = video_buffer_size;
       bytes += 20;
       send(&bytes);
       send(&video_tag);
       send(&frame->format);
       send(&frame->width);
       send(&frame->height);
-      send(video_buffer, video_buffer_size);
+      send(video_pointers[0], video_buffer_size);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
     /* decode audio frame */
@@ -153,6 +156,9 @@ int main (int argc, char **argv)
   }
   src_filename = argv[1];
   color_space = argv[2];
+
+  if (!strcmp(color_space, "yub420p"))
+    video_output_format = AV_PIX_FMT_YUV420P;
 
   /* register all formats and codecs */
   av_register_all();
