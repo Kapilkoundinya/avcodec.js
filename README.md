@@ -13,13 +13,13 @@ decode('video.mp4', (data) => console.log(data));
 >   format: 0,
 >   width: 1280,
 >   height: 720,
->   buffer: <Buffer ...> }
+>   buffer: ... }
 
 > { type: 'audio',
 >   format: 8,
 >   channels: 1,
 >   nb_samples: 1024,
->   buffer: <Buffer ...> }
+>   buffer: ... }
 
 > { type: 'done' }
 

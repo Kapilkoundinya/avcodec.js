@@ -45,7 +45,7 @@ function decode(videoName, callback) {
           format: block.readInt32LE(8),
           width: block.readInt32LE(12),
           height: block.readInt32LE(16),
-          data: block.slice(20),
+          buffer: block.slice(20),
         });
         break;
       case audio_tag:
@@ -54,7 +54,7 @@ function decode(videoName, callback) {
           format: block.readInt32LE(8),
           channels: block.readInt32LE(12),
           nb_samples: block.readInt32LE(16),
-          data: block.slice(20),
+          buffer: block.slice(20),
         });
         break;
       default:
