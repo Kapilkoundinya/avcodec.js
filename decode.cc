@@ -6,6 +6,8 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
+#include <unistd.h>
+
 static AVFormatContext *fmt_ctx = NULL;
 static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
 static AVStream *video_stream = NULL, *audio_stream = NULL;
@@ -20,6 +22,16 @@ static int video_buffer_size = 0;
 
 static int video_tag = 0x22057601;
 static int audio_tag = 0x22057602;
+
+static void send(void *ptr, int bytes)
+{
+  write(STDOUT_FILENO, ptr, bytes);
+}
+
+template <typename T>
+static void send(T *value) {
+  send(value, sizeof(T));
+}
 
 static int decode_packet(int *got_frame, int cached)
 {
@@ -44,19 +56,19 @@ static int decode_packet(int *got_frame, int cached)
 						     1);
 	video_buffer = (uint8_t*) malloc(video_buffer_size);
       }
-      int written = av_image_copy_to_buffer(video_buffer, video_buffer_size,
-					    frame->data, frame->linesize,
-					    AVPixelFormat(frame->format),
-					    frame->width,
-					    frame->height,
-					    1);
-      fwrite(&audio_tag, 1, sizeof(video_tag), stdout);
-      fwrite(&frame->width, 1, sizeof(frame->width), stdout);
-      fwrite(&frame->height, 1, sizeof(frame->height), stdout);
-      fwrite(&frame->format, 1, sizeof(frame->format), stdout);
-      fwrite(&written, 1, sizeof(video_buffer_size), stdout);
-      fwrite(video_buffer, 1, video_buffer_size, stdout);
-      fflush(stdout);
+      int bytes = av_image_copy_to_buffer(video_buffer, video_buffer_size,
+					  frame->data, frame->linesize,
+					  AVPixelFormat(frame->format),
+					  frame->width,
+					  frame->height,
+					  1);
+      bytes += 20;
+      send(&bytes);
+      send(&video_tag);
+      send(&frame->width);
+      send(&frame->height);
+      send(&frame->format);
+      send(video_buffer, video_buffer_size);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
     /* decode audio frame */
@@ -71,14 +83,14 @@ static int decode_packet(int *got_frame, int cached)
     if (*got_frame) {
       int unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(AVSampleFormat(frame->format));
       int bytes = unpadded_linesize * frame->channels;
-      fwrite(&video_tag, 1, sizeof(video_tag), stdout);
-      fwrite(&frame->channels, 1, sizeof(frame->channels), stdout);
-      fwrite(&frame->format, 1, sizeof(frame->format), stdout);
-      fwrite(&frame->nb_samples, 1, sizeof(frame->nb_samples), stdout);
-      fwrite(&bytes, 1, sizeof(bytes), stdout);
+      bytes += 20;
+      send(&bytes);
+      send(&audio_tag);
+      send(&frame->channels);
+      send(&frame->format);
+      send(&frame->nb_samples);
       for (int c = 0; c < frame->channels; ++c)
-	fwrite(frame->extended_data[c], 1, unpadded_linesize, stdout);
-      fflush(stdout);
+	send(frame->extended_data[c], unpadded_linesize);
     }
   }
 
@@ -162,9 +174,6 @@ int main (int argc, char **argv)
     audio_stream = fmt_ctx->streams[audio_stream_idx];
     audio_dec_ctx = audio_stream->codec;
   }
-
-  /* dump input information to stderr */
-  av_dump_format(fmt_ctx, 0, src_filename, 0);
 
   if (!audio_stream && !video_stream) {
     fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
