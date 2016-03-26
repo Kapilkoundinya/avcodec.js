@@ -6,8 +6,10 @@ also support encoding.
 ```javascript
 var decode = require('avcodec').decode;
 
-decode('video.mp4', data => console.log(data));
+decode('video.mp4', 'rgb', data => console.log(data));
 ```
+
+The color-space parameter can be 'yuv420p' or 'rgb'.
 
 > { type: 'video',
 >   format: 0,

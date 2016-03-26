@@ -9,13 +9,14 @@ extern "C" {
 
 #include <unistd.h>
 
-static AVFormatContext *fmt_ctx = NULL;
-static AVCodecContext *video_dec_ctx = NULL, *audio_dec_ctx;
-static AVStream *video_stream = NULL, *audio_stream = NULL;
-static const char *src_filename = NULL;
+static AVFormatContext *fmt_ctx = nullptr;
+static AVCodecContext *video_dec_ctx = nullptr, *audio_dec_ctx;
+static AVStream *video_stream = nullptr, *audio_stream = nullptr;
+static const char *src_filename = nullptr;
+static const char *color_space = nullptr;
 
 static int video_stream_idx = -1, audio_stream_idx = -1;
-static AVFrame *frame = NULL;
+static AVFrame *frame = nullptr;
 static AVPacket pkt;
 
 static uint8_t* video_buffer = nullptr;
@@ -103,11 +104,11 @@ static int open_codec_context(int *stream_idx,
 {
   int ret, stream_index;
   AVStream *st;
-  AVCodecContext *dec_ctx = NULL;
-  AVCodec *dec = NULL;
-  AVDictionary *opts = NULL;
+  AVCodecContext *dec_ctx = nullptr;
+  AVCodec *dec = nullptr;
+  AVDictionary *opts = nullptr;
 
-  ret = av_find_best_stream(fmt_ctx, type, -1, -1, NULL, 0);
+  ret = av_find_best_stream(fmt_ctx, type, -1, -1, nullptr, 0);
   if (ret < 0) {
     fprintf(stderr, "Could not find %s stream in input file '%s'\n",
 	    av_get_media_type_string(type), src_filename);
@@ -142,27 +143,29 @@ int main (int argc, char **argv)
 {
   int ret = 0, got_frame;
 
-  if (argc != 2) {
+  if (argc != 3) {
     fprintf(stderr,
-	    "usage: %s <video-file>\n"
-	    "This will dump video frames to stdout and audio frames to stderr.\n"
+	    "usage: %s <video-file> <color-space>\n"
+	    "This will dump video and audio frames to stdout using a simple protocol.\n"
+	    "color-space can be 'rgb' or 'yuv420p'.\n"
 	    , argv[0]);
     exit(-1);
   }
   src_filename = argv[1];
+  color_space = argv[2];
 
   /* register all formats and codecs */
   av_register_all();
   av_log_set_level(AV_LOG_QUIET);
 
   /* open input file, and allocate format context */
-  if (avformat_open_input(&fmt_ctx, src_filename, NULL, NULL) < 0) {
+  if (avformat_open_input(&fmt_ctx, src_filename, nullptr, nullptr) < 0) {
     fprintf(stderr, "Could not open source file %s\n", src_filename);
     exit(1);
   }
 
   /* retrieve stream information */
-  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+  if (avformat_find_stream_info(fmt_ctx, nullptr) < 0) {
     fprintf(stderr, "Could not find stream information\n");
     exit(1);
   }
@@ -190,9 +193,9 @@ int main (int argc, char **argv)
     goto end;
   }
 
-  /* initialize packet, set data to NULL, let the demuxer fill it */
+  /* initialize packet, set data to nullptr, let the demuxer fill it */
   av_init_packet(&pkt);
-  pkt.data = NULL;
+  pkt.data = nullptr;
   pkt.size = 0;
 
   /* read frames from the file */
@@ -209,7 +212,7 @@ int main (int argc, char **argv)
   }
 
   /* flush cached frames */
-  pkt.data = NULL;
+  pkt.data = nullptr;
   pkt.size = 0;
   do {
     decode_packet(&got_frame, 1);

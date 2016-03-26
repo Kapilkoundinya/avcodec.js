@@ -11,11 +11,11 @@ function dispatch(block, callback) {
   console.log(block.length);
 }
 
-function decode(videoName, callback) {
+function decode(videoName, colorSpace, callback) {
   var q = [];
   var q_len = 0;
 
-  var decoder = spawn(__dirname + '/build/Release/decode', [videoName]);
+  var decoder = spawn(__dirname + '/build/Release/decode', [videoName, colorSpace]);
 
   decoder.stdout.on('data', data => {
     q.push(data);
