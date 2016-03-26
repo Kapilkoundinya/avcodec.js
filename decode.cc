@@ -2,6 +2,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/samplefmt.h>
+#include <libavutil/log.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 }
@@ -152,6 +153,7 @@ int main (int argc, char **argv)
 
   /* register all formats and codecs */
   av_register_all();
+  av_log_set_level(AV_LOG_QUIET);
 
   /* open input file, and allocate format context */
   if (avformat_open_input(&fmt_ctx, src_filename, NULL, NULL) < 0) {
@@ -212,8 +214,6 @@ int main (int argc, char **argv)
   do {
     decode_packet(&got_frame, 1);
   } while (got_frame);
-
-  printf("Demuxing succeeded.\n");
 
  end:
   avcodec_close(video_dec_ctx);

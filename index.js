@@ -16,6 +16,7 @@ function decode(videoName, callback) {
   var q_len = 0;
 
   var decoder = spawn(__dirname + '/build/Release/decode', [videoName]);
+
   decoder.stdout.on('data', data => {
     q.push(data);
     q_len += data.length;
@@ -37,8 +38,18 @@ function decode(videoName, callback) {
       if (buffer.length < bytes)
         return;
       var block = buffer.slice(0, bytes);
-      dispatch(block, callback);
-      // use block
+      switch(block.readInt32LE(4)) {
+      case video_tag:
+        break;
+      case audio_tag:
+        break;
+      default:
+        // Something went wrong. Kill the decoder which will report an
+        // error to the callback.
+        decoder.kill('SIGKILL');
+        break;
+      }
+      // Process the rest of the buffer in the next iteration.
       var buffer = buffer.slice(bytes);
       if (buffer.length) {
         q[0] = buffer;
@@ -49,7 +60,8 @@ function decode(videoName, callback) {
       q_len = buffer.length;
     }
   });
-  decoder.on('close', code => callback('done', code));
+  decoder.stderr.on('data', data => callback('error', data.toString('utf8')));
+  decoder.on('close', code => callback(code ? 'error' : 'done', code));
 }
 
-decode('breathing.mp4', () => {});
+decode('breathing.mp4', (what, data) => console.log(what, data));
