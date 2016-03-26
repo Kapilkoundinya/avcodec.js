@@ -66,9 +66,9 @@ static int decode_packet(int *got_frame, int cached)
       bytes += 20;
       send(&bytes);
       send(&video_tag);
+      send(&frame->format);
       send(&frame->width);
       send(&frame->height);
-      send(&frame->format);
       send(video_buffer, video_buffer_size);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
@@ -87,8 +87,8 @@ static int decode_packet(int *got_frame, int cached)
       bytes += 20;
       send(&bytes);
       send(&audio_tag);
-      send(&frame->channels);
       send(&frame->format);
+      send(&frame->channels);
       send(&frame->nb_samples);
       for (int c = 0; c < frame->channels; ++c)
 	send(frame->extended_data[c], unpadded_linesize);

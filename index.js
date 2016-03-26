@@ -40,8 +40,20 @@ function decode(videoName, callback) {
       var block = buffer.slice(0, bytes);
       switch(block.readInt32LE(4)) {
       case video_tag:
+        callback('video', {
+          format: block.readInt32LE(8),
+          width: block.readInt32LE(12),
+          height: block.readInt32LE(16),
+          data: block.slice(20),
+        });
         break;
       case audio_tag:
+        callback('audio', {
+          format: block.readInt32LE(8),
+          channels: block.readInt32LE(12),
+          nb_samples: block.readInt32LE(16),
+          data: block.slice(20),
+        });
         break;
       default:
         // Something went wrong. Kill the decoder which will report an
