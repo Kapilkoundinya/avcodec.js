@@ -6,7 +6,7 @@ also support encoding.
 ```javascript
 var decode = require('avcodec').decode;
 
-decode('video.mp4', (data) => console.log(data));
+decode('video.mp4', data => console.log(data));
 ```
 
 > { type: 'video',
