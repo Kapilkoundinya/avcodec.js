@@ -40,7 +40,8 @@ function decode(videoName, callback) {
       var block = buffer.slice(0, bytes);
       switch(block.readInt32LE(4)) {
       case video_tag:
-        callback('video', {
+        callback({
+          type: 'video',
           format: block.readInt32LE(8),
           width: block.readInt32LE(12),
           height: block.readInt32LE(16),
@@ -48,7 +49,8 @@ function decode(videoName, callback) {
         });
         break;
       case audio_tag:
-        callback('audio', {
+        callback({
+          type: 'audio',
           format: block.readInt32LE(8),
           channels: block.readInt32LE(12),
           nb_samples: block.readInt32LE(16),
@@ -72,8 +74,12 @@ function decode(videoName, callback) {
       q_len = buffer.length;
     }
   });
-  decoder.stderr.on('data', data => callback('error', data.toString('utf8')));
-  decoder.on('close', code => callback(code ? 'error' : 'done', code));
+  decoder.stderr.on('data', data => callback({ type: 'error', message: data.toString('utf8') }));
+  decoder.on('close', code => callback(code
+                                       ? { type: 'error', message: 'decoder error code ' + code }
+                                       : { type: 'done' }));
 }
 
-decode('breathing.mp4', (what, data) => console.log(what, data));
+module.exports = {
+  decode: decode,
+};
