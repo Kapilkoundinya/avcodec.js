@@ -4,10 +4,13 @@
   "description": "Node.js video encoding/decoding with libavcodec",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js"
+    "test": "./node_modules/nodeunit/bin/nodeunit test/test.js"
   },
   "gypfile": true,
   "dependencies": {
     "bindings": "^1.2.1"
+  },
+  "devDependencies": {
+    "sdl-runtime": "https://github.com/Artificial-Engineering/node-sdl-runtime.git"
   }
 }
