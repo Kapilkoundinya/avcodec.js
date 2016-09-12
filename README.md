@@ -3,6 +3,14 @@
 Decode a video into image and audio frames. In the future we will likely
 also support encoding.
 
+## Dependencies
+
+```
+brew install ffmpeg
+```
+
+## Usage 
+
 ```javascript
 var decode = require('avcodec').decode;
 
