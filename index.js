@@ -80,6 +80,7 @@ function decode(videoName, colorSpace, callback) {
   decoder.on('close', code => callback(code
                                        ? { type: 'error', message: 'decoder error code ' + code }
                                        : { type: 'done' }));
+  return {close: () => decoder.kill('SIGTERM')};
 }
 
 module.exports = {
