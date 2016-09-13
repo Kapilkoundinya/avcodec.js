@@ -70,7 +70,7 @@ static int decode_packet(int *got_frame, int cached)
       bytes += 20;
       send(&bytes);
       send(&video_tag);
-      send(&frame->format);
+      send(&video_output_format);
       send(&frame->width);
       send(&frame->height);
       send(video_pointers[0], video_buffer_size);
