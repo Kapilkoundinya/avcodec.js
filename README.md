@@ -17,10 +17,11 @@ var decode = require('avcodec').decode;
 decode('video.mp4', 'rgb', data => console.log(data));
 ```
 
-The color-space parameter can be 'yuv420p' or 'rgb'.
+The color-space parameter can be 'yuv420p' or 'rgb' or 'bgr'.
 
 > { type: 'video',
 >   format: 0,
+>   fps: 30.0,
 >   width: 1280,
 >   height: 720,
 >   buffer: ... }

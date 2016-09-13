@@ -6,7 +6,7 @@ exports.testDecode = test => {
   decode('test/test.mp4', 'rgb', data => {
     test.ok(!done);
     if (data.type == 'video')
-      test.ok(data.width == 320 && data.height == 180 && data.format == 2);
+      test.ok(data.width == 320 && data.height == 180 && data.format == 2 && data.num_frames == 24 && data.fps == 24.0);
     if (data.type == 'audio')
       test.ok(data.channels == 2 && (data.nb_samples == 1024 || data.nb_samples == 256) && data.format == 8);
     if (data.type == 'done') {

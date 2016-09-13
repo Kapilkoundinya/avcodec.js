@@ -65,14 +65,23 @@ static int decode_packet(int *got_frame, int cached)
 				 frame->width, frame->height, video_output_format,
 				 SWS_BILINEAR, nullptr, nullptr, nullptr);
       }
+      // https://ffmpeg.org/pipermail/libav-user/2013-May/004715.html
+      AVRational frame_rate = video_stream->r_frame_rate;
+      if (video_stream->codec->codec_id == AV_CODEC_ID_H264 ) {
+        frame_rate = video_stream->avg_frame_rate;
+      }
+      double fps = frame_rate.num / (double) frame_rate.den;
+      unsigned int nb_frames = (unsigned int) video_stream->nb_frames;
       sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height, video_pointers, video_linesizes);
       int bytes = video_buffer_size;
-      bytes += 20;
+      bytes += 32;
       send(&bytes);
       send(&video_tag);
       send(&video_output_format);
       send(&frame->width);
       send(&frame->height);
+      send(&nb_frames);
+      send(&fps);
       send(video_pointers[0], video_buffer_size);
     }
   } else if (pkt.stream_index == audio_stream_idx) {
@@ -159,6 +168,8 @@ int main (int argc, char **argv)
 
   if (!strcmp(color_space, "yub420p"))
     video_output_format = AV_PIX_FMT_YUV420P;
+  else if (!strcmp(color_space, "bgr"))
+    video_output_format = AV_PIX_FMT_BGR24;
 
   /* register all formats and codecs */
   av_register_all();

@@ -45,7 +45,9 @@ function decode(videoName, colorSpace, callback) {
           format: block.readInt32LE(8),
           width: block.readInt32LE(12),
           height: block.readInt32LE(16),
-          buffer: block.slice(20),
+          num_frames: block.readUInt32LE(20),
+          fps: block.readDoubleLE(24),
+          buffer: block.slice(32),
         });
         break;
       case audio_tag:
