@@ -8,7 +8,7 @@ exports.testDecode = test => {
     if (data.type == 'video')
       test.ok(data.width == 320 && data.height == 180 && data.format == 0);
     if (data.type == 'audio')
-      test.ok(data.channels == 2 && data.nb_samples == 1024 && data.format == 8);
+      test.ok(data.channels == 2 && (data.nb_samples == 1024 || data.nb_samples == 256) && data.format == 8);
     if (data.type == 'done') {
       test.ok(true);
       test.done();

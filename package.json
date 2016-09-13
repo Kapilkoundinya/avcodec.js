@@ -11,6 +11,7 @@
     "bindings": "^1.2.1"
   },
   "devDependencies": {
+    "nodeunit": "^0.10.2",
     "sdl-runtime": "https://github.com/Artificial-Engineering/node-sdl-runtime.git"
   }
 }
